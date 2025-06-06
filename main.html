@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Notas do Trimestre</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    import { getDatabase, ref, set, remove, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-vItRHN7ypHVLE9vmJZUT6FtUtCA4718",
+      authDomain: "notas-1-23.firebaseapp.com",
+      projectId: "notas-1-23",
+      storageBucket: "notas-1-23.appspot.com",
+      messagingSenderId: "96350295822",
+      appId: "1:96350295822:web:d794bd7c10a78cdb70295f",
+      measurementId: "G-KXSMP53RHK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let currentUser = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          currentUser = user;
+          carregarNotas();
+
+          const alunoInput = document.getElementById('aluno');
+          alunoInput.value = user.displayName || '';
+          alunoInput.readOnly = true;
+        } else {
+          window.location.href = 'index.html';
+        }
+      });
+
+      const notasForm = document.getElementById('notasForm');
+      notasForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) {
+          alert("Você precisa estar logado para salvar notas.");
+          return;
+        }
+
+        const nome = document.getElementById('aluno').value;
+        const disciplina = document.getElementById('disciplina').value;
+        const p1Input = document.getElementById('p1').value;
+        const p2Input = document.getElementById('p2').value;
+        const rpInput = document.getElementById('rp').value;
+
+        const disciplinaRef = ref(db, `notas/alunos/${nome}/disciplinas/${disciplina}`);
+
+        let dadosAnteriores = {};
+        await new Promise((resolve) => {
+          onValue(disciplinaRef, (snapshot) => {
+            if (snapshot.exists()) {
+              dadosAnteriores = snapshot.val();
+            }
+            resolve();
+          }, { onlyOnce: true });
+        });
+
+        const p1 = p1Input !== "" ? parseFloat(p1Input) : (dadosAnteriores.p1 || 0);
+        const p2 = p2Input !== "" ? parseFloat(p2Input) : (dadosAnteriores.p2 || 0);
+        const rp = rpInput !== "" ? parseFloat(rpInput) : (dadosAnteriores.rp || 0);
+
+        await set(disciplinaRef, { p1, p2, rp });
+        notasForm.reset();
+
+        document.getElementById('aluno').value = currentUser.displayName || '';
+        document.getElementById('aluno').readOnly = true;
+
+        alert('Notas salvas com sucesso!');
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        signOut(auth).then(() => {
+          window.location.href = 'index.html';
+        });
+      });
+
+      document.getElementById('limparNotasBtn').addEventListener('click', async () => {
+        if (confirm("Tem certeza que deseja apagar todas as notas? Esta ação não pode ser desfeita.")) {
+          const userRef = ref(db, `notas/alunos/`);
+          await remove(userRef);
+          alert('Todas as notas foram removidas!');
+          carregarNotas();
+        }
+      });
+    });
+
+    function carregarNotas() {
+      const tableBody = document.querySelector('#notasTable tbody');
+      const rankingTableBody = document.querySelector('#rankingTable tbody');
+      const userRef = ref(db, `notas/alunos/`);
+      onValue(userRef, (snapshot) => {
+        tableBody.innerHTML = '';
+        rankingTableBody.innerHTML = '';
+        const data = snapshot.val();
+        const alunos = [];
+        const disciplinaMap = {};
+
+        if (data) {
+          for (const nome in data) {
+            const disciplinas = data[nome].disciplinas;
+            let somaMedias = 0;
+            let count = 0;
+
+            tableBody.innerHTML += `
+              <tr style="background-color:#ddd; font-weight:bold;">
+                <td colspan="6">${nome}</td>
+              </tr>
+            `;
+
+            for (const disciplina in disciplinas) {
+              const d = disciplinas[disciplina];
+              if (d.p1 || d.p2 || d.rp) {
+                const media = calcularMedia(d);
+                somaMedias += parseFloat(media);
+                count++;
+
+                tableBody.innerHTML += `
+                  <tr>
+                    <td></td>
+                    <td>${disciplina}</td>
+                    <td>${d.p1}</td>
+                    <td>${d.p2}</td>
+                    <td>${d.rp}</td>
+                    <td>${media}</td>
+                  </tr>
+                `;
+
+                if (!disciplinaMap[disciplina]) disciplinaMap[disciplina] = [];
+                disciplinaMap[disciplina].push({ nome, media: parseFloat(media) });
+              }
+            }
+
+            const mediaFinal = count > 0 ? (somaMedias / count) : 0;
+            alunos.push({ nome, mediaFinal: mediaFinal.toFixed(2) });
+          }
+        }
+
+        rankingTableBody.innerHTML += `
+          <tr style="background-color:#ccc; font-weight:bold;">
+            <td colspan="3">Ranking por Disciplina</td>
+          </tr>
+        `;
+        for (const disciplina in disciplinaMap) {
+          rankingTableBody.innerHTML += `
+            <tr style="background-color:#eee;">
+              <td colspan="3">${disciplina}</td>
+            </tr>
+          `;
+          const listaDisciplina = disciplinaMap[disciplina];
+          listaDisciplina.sort((a, b) => b.media - a.media);
+          listaDisciplina.forEach((aluno, index) => {
+            rankingTableBody.innerHTML += `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${aluno.nome}</td>
+                <td>${aluno.media.toFixed(2)}</td>
+              </tr>
+            `;
+          });
+        }
+
+        alunos.sort((a, b) => b.mediaFinal - a.mediaFinal);
+        rankingTableBody.innerHTML += `
+          <tr style="background-color:#ccc; font-weight:bold;">
+            <td colspan="3">Ranking Geral</td>
+          </tr>
+        `;
+        alunos.forEach((aluno, index) => {
+          rankingTableBody.innerHTML += `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${aluno.nome}</td>
+              <td>${aluno.mediaFinal}</td>
+            </tr>
+          `;
+        });
+      });
+    }
+
+    function calcularMedia(d) {
+      const p1 = d.p1 || 0;
+      const p2 = d.p2 || 0;
+      const rp = d.rp || 0;
+      const mediaP1P2 = (p1 + p2) / 2;
+      return (mediaP1P2 < 6 ? (mediaP1P2 + rp) / 2 : mediaP1P2).toFixed(2);
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Notas do Trimestre</h1>
+    <button id="logoutBtn" class="btn-secondary">Sair</button>
+    <button id="limparNotasBtn" class="btn-red">Limpar Todas as Notas</button>
+
+    <form id="notasForm">
+      <label for="aluno">Aluno:</label>
+      <input type="text" id="aluno" required>
+      <label for="disciplina">Disciplina:</label>
+      <select id="disciplina" required>
+        <option>Álgebra</option>
+        <option>Arte</option>
+        <option>Biologia</option>
+        <option>Educação Física</option>
+        <option>Filosofia</option>
+        <option>Física</option>
+        <option>Geografia</option>
+        <option>Geometria</option>
+        <option>História</option>
+        <option>Inglês</option>
+        <option>Sociologia</option>
+      </select>
+      <label for="p1">P1:</label>
+      <input type="number" id="p1" min="0" max="10" step="0.1">
+      <label for="p2">P2:</label>
+      <input type="number" id="p2" min="0" max="10" step="0.1">
+      <label for="rp">RP:</label>
+      <input type="number" id="rp" min="0" max="10" step="0.1">
+      <button type="submit">Salvar Nota</button>
+    </form>
+
+    <div class="ranking-section">
+      <h3>Ranking de Notas</h3>
+      <table id="rankingTable">
+        <thead><tr><th>Posição</th><th>Aluno</th><th>Média</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="notas-section">
+      <h3>Notas por Disciplina</h3>
+      <table id="notasTable">
+        <thead>
+          <tr>
+            <th>Aluno</th>
+            <th>Disciplina</th>
+            <th>P1</th>
+            <th>P2</th>
+            <th>RP</th>
+            <th>Média</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

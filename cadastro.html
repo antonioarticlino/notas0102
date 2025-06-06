@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-vItRHN7ypHVLE9vmJZUT6FtUtCA4718",
+      authDomain: "notas-1-23.firebaseapp.com",
+      projectId: "notas-1-23",
+      storageBucket: "notas-1-23.appspot.com",
+      messagingSenderId: "96350295822",
+      appId: "1:96350295822:web:d794bd7c10a78cdb70295f",
+      measurementId: "G-KXSMP53RHK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const cadastroForm = document.getElementById('cadastroForm');
+      cadastroForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const apelido = document.getElementById('cadastroApelido').value;
+        const email = document.getElementById('cadastroEmail').value;
+        const senha = document.getElementById('cadastroSenha').value;
+
+        try {
+          // Cria o usuário no Firebase Authentication
+          const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+          const user = userCredential.user;
+
+          // Atualiza o displayName (apelido) no perfil do usuário
+          await updateProfile(user, { displayName: apelido });
+
+          // Salva os dados do usuário no Firestore
+          await setDoc(doc(db, "usuarios", user.uid), {
+            uid: user.uid,
+            apelido: apelido,
+            email: email,
+            createdAt: new Date().toISOString()
+          });
+
+          alert('Cadastro realizado com sucesso!');
+          window.location.href = 'login.html';
+        } catch (error) {
+          console.error('Erro no cadastro:', error);
+          alert('Erro no cadastro: ' + error.message);
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Cadastro</h1>
+    <form id="cadastroForm">
+      <label for="cadastroApelido">Apelido:</label>
+      <input type="text" id="cadastroApelido" required>
+
+      <label for="cadastroEmail">Email:</label>
+      <input type="email" id="cadastroEmail" required>
+
+      <label for="cadastroSenha">Senha:</label>
+      <input type="password" id="cadastroSenha" required>
+
+      <button type="submit">Cadastrar</button>
+      <button type="button" onclick="window.location.href='index.html'" style="background-color: #2196F3;">Voltar para Login</button>
+    </form>
+  </div>
+</body>
+</html>

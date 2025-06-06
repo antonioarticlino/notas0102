@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA-vItRHN7ypHVLE9vmJZUT6FtUtCA4718",
+      authDomain: "notas-1-23.firebaseapp.com",
+      projectId: "notas-1-23",
+      storageBucket: "notas-1-23.appspot.com",
+      messagingSenderId: "96350295822",
+      appId: "1:96350295822:web:d794bd7c10a78cdb70295f",
+      measurementId: "G-KXSMP53RHK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const loginForm = document.getElementById('loginForm');
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const senha = document.getElementById('loginSenha').value;
+        try {
+          await signInWithEmailAndPassword(auth, email, senha);
+          window.location.href = 'main.html';
+        } catch (error) {
+          alert('Erro no login: ' + error.message);
+        }
+      });
+
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          window.location.href = 'main.html';
+        }
+      });
+
+      const toggleSenha = document.getElementById('toggleSenha');
+      toggleSenha.addEventListener('click', () => {
+        const senhaInput = document.getElementById('loginSenha');
+        const tipo = senhaInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        senhaInput.setAttribute('type', tipo);
+        toggleSenha.textContent = tipo === 'password' ? '👁️' : '🙈';
+      });
+    });
+  </script>
+</head>
+<body>
+  <div class="background">
+    <div class="container">
+      <h1>Login</h1>
+      <form id="loginForm">
+        <label for="loginEmail">Email:</label>
+        <input type="email" id="loginEmail" required>
+
+        <label for="loginSenha">Senha:</label>
+        <div class="password-wrapper">
+          <input type="password" id="loginSenha" required>
+          <button type="button" id="toggleSenha" class="toggle-btn">👁️</button>
+        </div>
+
+        <button type="submit">Entrar</button>
+        <button type="button" class="btn-secondary" onclick="window.location.href='cadastro.html'">Criar Conta</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
